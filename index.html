@@ -752,7 +752,7 @@ const ENV = {
                     </div>
                     
                     <div class="alert alert-warning">
-                        <strong>Atenção:</strong> Cada jogada custará R$ 0,50 (valor fixo)
+                        <strong>Atenção:</strong> Cada jogada custará R$ 1,00 (valor fixo)
                     </div>
                     
                     <div class="form-group">
@@ -789,7 +789,7 @@ const ENV = {
                         </button>
                     </div>
                     <div style="font-size: 14px; opacity: 0.9;">
-                        Cada jogada custa R$ 0,50 • Solicite liberação ao administrador
+                        Cada jogada custa R$ 1,00 • Solicite liberação ao administrador
                     </div>
                 </div>
 
@@ -862,7 +862,7 @@ const ENV = {
                 <input type="number" id="numberOfPlays" min="1" max="100" value="1" placeholder="Quantas jogadas liberar?">
             </div>
             <div style="margin: 20px 0; font-size: 14px; color: #666;">
-                Custo total: R$ <span id="totalCost">0,50</span>
+                Custo total: R$ <span id="totalCost">1,00</span>
             </div>
             <button class="btn" onclick="enablePlays()">✅ Liberar</button>
             <button class="btn btn-secondary" onclick="closeEnablePlaysModal()">❌ Cancelar</button>
@@ -898,7 +898,7 @@ const ENV = {
         let currentGame = null;
         let isAdmin = false;
         let gameHistory = [];
-        const PLAY_VALUE = 0.50; // Valor fixo por jogada
+        const PLAY_VALUE = 1; // Valor fixo por jogada
 
         // Validate and Initialize Firebase
         function validateConfig() {

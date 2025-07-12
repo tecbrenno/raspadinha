@@ -4,6 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sistema de Raspadinha</title>
+    <!-- Firebase Scripts -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+    
     <style>
         * {
             margin: 0;
@@ -73,6 +78,26 @@
 
         .screen.active {
             display: block;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 50px;
+        }
+
+        .loading-spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #4ECDC4;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
         }
 
         /* Control Panel */
@@ -525,6 +550,46 @@
             border: 1px solid #c3e6cb;
         }
 
+        .alert-error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .config-error {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            margin: 20px;
+        }
+
+        .config-error h3 {
+            margin-bottom: 15px;
+        }
+
+        .config-instructions {
+            background: #d1ecf1;
+            border: 1px solid #bee5eb;
+            color: #0c5460;
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+        }
+
+        .config-instructions h4 {
+            margin-bottom: 10px;
+        }
+
+        .config-instructions code {
+            background: #f8f9fa;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: monospace;
+        }
+
         @media (max-width: 768px) {
             .container {
                 width: 98%;
@@ -565,16 +630,73 @@
         </div>
         
         <div class="content">
+            <!-- Configuration Error Screen -->
+            <div id="configErrorScreen" class="screen">
+                <div class="config-error">
+                    <h3>⚠️ Configuração do Firebase Necessária</h3>
+                    <p>As configurações do Firebase não foram encontradas ou estão inválidas.</p>
+                </div>
+                
+                <div class="config-instructions">
+                    <h4>📋 Como Configurar:</h4>
+                    <p><strong>1. Edite o arquivo e configure as variáveis de ambiente no início do código JavaScript:</strong></p>
+                    <pre style="background: #f8f9fa; padding: 15px; border-radius: 5px; overflow-x: auto; font-size: 12px;">
+// ==========================================
+// 🔧 CONFIGURAÇÕES DO FIREBASE (.env)
+// ==========================================
+const ENV = {
+    FIREBASE_API_KEY: "",
+    FIREBASE_AUTH_DOMAIN: "",
+    FIREBASE_PROJECT_ID: "",
+    FIREBASE_STORAGE_BUCKET: "",
+    FIREBASE_MESSAGING_SENDER_ID: "",
+    FIREBASE_APP_ID: ""
+};</pre>
+                    
+                    <p><strong>2. Como obter essas informações:</strong></p>
+                    <ul style="text-align: left; margin: 10px 0 10px 20px;">
+                        <li>Acesse o <a href="https://console.firebase.google.com" target="_blank">Firebase Console</a></li>
+                        <li>Selecione seu projeto (ou crie um novo)</li>
+                        <li>Vá em "Configurações do projeto" > "Geral"</li>
+                        <li>Na seção "Seus apps", clique em "Configuração" no app web</li>
+                        <li>Copie as informações do <code>firebaseConfig</code></li>
+                    </ul>
+                    
+                    <p><strong>3. Configure também:</strong></p>
+                    <ul style="text-align: left; margin: 10px 0 10px 20px;">
+                        <li><strong>Authentication:</strong> Habilite "Email/senha" e crie um usuário administrador</li>
+                        <li><strong>Firestore Database:</strong> Crie um banco de dados (modo de teste inicialmente)</li>
+                    </ul>
+                </div>
+                
+                <div style="text-align: center;">
+                    <button class="btn" onclick="location.reload()">🔄 Recarregar Página</button>
+                </div>
+            </div>
+
+            <!-- Loading Screen -->
+            <div id="loadingScreen" class="screen">
+                <div class="loading">
+                    <div class="loading-spinner"></div>
+                    <p>Conectando ao Firebase...</p>
+                </div>
+            </div>
+
             <!-- Login Screen -->
-            <div id="loginScreen" class="screen active">
+            <div id="loginScreen" class="screen">
                 <div class="login-form">
-                    <h2>Acesso Administrativo</h2>
+                    <h2>Acesso ao Sistema</h2>
+                    <div class="form-group">
+                        <label>Email:</label>
+                        <input type="email" id="adminEmail" placeholder="admin@exemplo.com">
+                    </div>
                     <div class="form-group">
                         <label>Senha:</label>
                         <input type="password" id="adminPassword" placeholder="Digite a senha" onkeypress="checkEnter(event)">
                     </div>
-                    <button class="btn" onclick="login()">Entrar</button>
+                    <button class="btn" onclick="login()">Entrar como Admin</button>
                     <button class="btn btn-secondary" onclick="showGameSelection()">Jogar</button>
+                    <div id="loginError" class="alert alert-error" style="display: none;"></div>
                 </div>
             </div>
 
@@ -748,6 +870,29 @@
     </div>
 
     <script>
+        // ==========================================
+        // 🔧 CONFIGURAÇÕES DO FIREBASE (.env)
+        // ==========================================
+        // SUBSTITUA ESTAS VARIÁVEIS PELAS SUAS CREDENCIAIS DO FIREBASE
+        const ENV = {
+            FIREBASE_API_KEY: "AIzaSyC38lT-q48FgGJQYTQyrt4ff_oIa4N-8rs",
+            FIREBASE_AUTH_DOMAIN: "raspadinha-a3336.firebaseapp.com",
+            FIREBASE_PROJECT_ID: "raspadinha-a3336",
+            FIREBASE_STORAGE_BUCKET: "raspadinha-a3336.firebasestorage.app",
+            FIREBASE_MESSAGING_SENDER_ID: "663047020334",
+            FIREBASE_APP_ID: "1:663047020334:web:805a410cf61c05aaed24bf"
+        };
+
+        // ==========================================
+        // 📱 SISTEMA DE RASPADINHA
+        // ==========================================
+
+        // Firebase variables
+        let db = null;
+        let auth = null;
+        let firebaseApp = null;
+        let isFirebaseInitialized = false;
+
         // Game data storage
         let games = [];
         let currentGame = null;
@@ -755,30 +900,159 @@
         let gameHistory = [];
         const PLAY_VALUE = 0.50; // Valor fixo por jogada
 
-        // Initialize with sample data
-        function initSampleData() {
-            games = [
-                {
-                    id: 1,
-                    description: "Pack de Heineken (6 un)",
-                    value: 30, // Valor menor para teste
-                    numbersCount: 30,
-                    playValue: PLAY_VALUE,
-                    image: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='200' viewBox='0 0 300 200'%3E%3Crect fill='%2300A651' width='300' height='200' rx='20'/%3E%3Ctext x='50%25' y='40%25' font-size='16' fill='white' text-anchor='middle' dy='.3em'%3EPack Heineken%3C/text%3E%3Ctext x='50%25' y='65%25' font-size='14' fill='white' text-anchor='middle' dy='.3em'%3E(6 unidades)%3C/text%3E%3C/svg%3E",
-                    totalRevenue: 0,
-                    playedNumbers: [],
-                    winnerNumber: null, // Será definido quando atingir 150%
-                    availablePlays: 0,
-                    totalPlaysEnabled: 0,
-                    status: 'active',
-                    created: new Date().toISOString(),
-                    playsHistory: []
-                }
-            ];
+        // Validate and Initialize Firebase
+        function validateConfig() {
+            return ENV.FIREBASE_API_KEY && 
+                   ENV.FIREBASE_AUTH_DOMAIN && 
+                   ENV.FIREBASE_PROJECT_ID &&
+                   ENV.FIREBASE_API_KEY.trim() !== "" &&
+                   ENV.FIREBASE_AUTH_DOMAIN.trim() !== "" &&
+                   ENV.FIREBASE_PROJECT_ID.trim() !== "";
         }
 
-        initSampleData();
+        async function initializeFirebase() {
+            if (!validateConfig()) {
+                console.error('Firebase configuration is missing or invalid');
+                showScreen('configErrorScreen');
+                return false;
+            }
 
+            const firebaseConfig = {
+                apiKey: ENV.FIREBASE_API_KEY,
+                authDomain: ENV.FIREBASE_AUTH_DOMAIN,
+                projectId: ENV.FIREBASE_PROJECT_ID,
+                storageBucket: ENV.FIREBASE_STORAGE_BUCKET,
+                messagingSenderId: ENV.FIREBASE_MESSAGING_SENDER_ID,
+                appId: ENV.FIREBASE_APP_ID
+            };
+
+            showScreen('loadingScreen');
+
+            try {
+                // Initialize Firebase
+                firebaseApp = firebase.initializeApp(firebaseConfig);
+                db = firebase.firestore();
+                auth = firebase.auth();
+
+                // Test connection
+                await db.collection('test').doc('connection').set({
+                    timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                    test: true
+                });
+
+                console.log('Firebase connected successfully');
+                isFirebaseInitialized = true;
+                
+                await loadData();
+                showLogin();
+                return true;
+
+            } catch (error) {
+                console.error('Firebase initialization failed:', error);
+                alert('Erro ao conectar com Firebase: ' + error.message);
+                showScreen('configErrorScreen');
+                return false;
+            }
+        }
+
+        // Firebase Database Functions
+        async function saveGame(game) {
+            if (!db) return;
+            try {
+                await db.collection('games').doc(game.id.toString()).set(game);
+                console.log('Game saved:', game.id);
+            } catch (error) {
+                console.error('Error saving game:', error);
+                throw error;
+            }
+        }
+
+        async function loadGames() {
+            if (!db) return [];
+            try {
+                const snapshot = await db.collection('games').orderBy('created', 'desc').get();
+                const games = [];
+                snapshot.forEach(doc => {
+                    games.push(doc.data());
+                });
+                return games;
+            } catch (error) {
+                console.error('Error loading games:', error);
+                return [];
+            }
+        }
+
+        async function saveGameHistory(historyEntry) {
+            if (!db) return;
+            try {
+                await db.collection('gameHistory').add(historyEntry);
+                console.log('History entry saved');
+            } catch (error) {
+                console.error('Error saving history:', error);
+            }
+        }
+
+        async function loadGameHistory() {
+            if (!db) return [];
+            try {
+                const snapshot = await db.collection('gameHistory').orderBy('timestamp', 'desc').get();
+                const history = [];
+                snapshot.forEach(doc => {
+                    history.push(doc.data());
+                });
+                return history;
+            } catch (error) {
+                console.error('Error loading history:', error);
+                return [];
+            }
+        }
+
+        async function loadData() {
+            try {
+                games = await loadGames();
+                gameHistory = await loadGameHistory();
+                console.log('Data loaded:', { games: games.length, history: gameHistory.length });
+                
+                // Create sample game if no games exist
+                if (games.length === 0) {
+                    await createSampleGame();
+                }
+            } catch (error) {
+                console.error('Error loading data:', error);
+                // Create sample data on error
+                games = [];
+                gameHistory = [];
+                await createSampleGame();
+            }
+        }
+
+        async function createSampleGame() {
+            const sampleGame = {
+                id: Date.now(),
+                description: "Pack de Heineken (6 un)",
+                value: 30,
+                numbersCount: 30,
+                playValue: PLAY_VALUE,
+                image: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='200' viewBox='0 0 300 200'%3E%3Crect fill='%2300A651' width='300' height='200' rx='20'/%3E%3Ctext x='50%25' y='40%25' font-size='16' fill='white' text-anchor='middle' dy='.3em'%3EPack Heineken%3C/text%3E%3Ctext x='50%25' y='65%25' font-size='14' fill='white' text-anchor='middle' dy='.3em'%3E(6 unidades)%3C/text%3E%3C/svg%3E",
+                totalRevenue: 0,
+                playedNumbers: [],
+                winnerNumber: null,
+                availablePlays: 0,
+                totalPlaysEnabled: 0,
+                status: 'active',
+                created: new Date().toISOString(),
+                playsHistory: []
+            };
+            
+            games.push(sampleGame);
+            try {
+                await saveGame(sampleGame);
+            } catch (error) {
+                console.error('Error saving sample game:', error);
+            }
+        }
+
+        // Screen Management
         function showScreen(screenId) {
             document.querySelectorAll('.screen').forEach(screen => {
                 screen.classList.remove('active');
@@ -787,6 +1061,10 @@
         }
 
         function showLogin() {
+            if (!isFirebaseInitialized) {
+                showScreen('configErrorScreen');
+                return;
+            }
             showScreen('loginScreen');
         }
 
@@ -800,6 +1078,10 @@
         }
 
         function showGameSelection() {
+            if (!isFirebaseInitialized) {
+                showScreen('configErrorScreen');
+                return;
+            }
             populateGamesList();
             showScreen('gameSelectionScreen');
         }
@@ -835,22 +1117,50 @@
             }
         }
 
-        function login() {
+        // Authentication
+        async function login() {
+            if (!auth) {
+                alert('Firebase não inicializado!');
+                return;
+            }
+
+            const email = document.getElementById('adminEmail').value;
             const password = document.getElementById('adminPassword').value;
-            if (password === 'admin123') {
+            const errorDiv = document.getElementById('loginError');
+
+            if (!email || !password) {
+                errorDiv.textContent = 'Por favor, preencha email e senha';
+                errorDiv.style.display = 'block';
+                return;
+            }
+
+            try {
+                errorDiv.style.display = 'none';
+                await auth.signInWithEmailAndPassword(email, password);
                 isAdmin = true;
                 showAdmin();
+                document.getElementById('adminEmail').value = '';
                 document.getElementById('adminPassword').value = '';
-            } else {
-                alert('Senha incorreta!');
+            } catch (error) {
+                console.error('Login error:', error);
+                errorDiv.textContent = 'Erro no login: ' + error.message;
+                errorDiv.style.display = 'block';
             }
         }
 
-        function logout() {
+        async function logout() {
+            if (auth) {
+                try {
+                    await auth.signOut();
+                } catch (error) {
+                    console.error('Logout error:', error);
+                }
+            }
             isAdmin = false;
             showLogin();
         }
 
+        // Admin Dashboard
         function updateAdminStats() {
             document.getElementById('totalGames').textContent = games.length;
             
@@ -864,13 +1174,14 @@
             document.getElementById('totalPlays').textContent = totalPlays;
         }
 
-        function createGame(event) {
+        // Game Creation
+        async function createGame(event) {
             event.preventDefault();
             
             const numbersCount = parseInt(document.getElementById('numbersCount').value);
             
             if (numbersCount < 5 || numbersCount > 500) {
-                alert('A quantidade de números deve estar entre 5 e 100!');
+                alert('A quantidade de números deve estar entre 5 e 500!');
                 return;
             }
             
@@ -883,7 +1194,7 @@
                 image: document.getElementById('prizeImage').value || 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="300" height="200" viewBox="0 0 300 200"%3E%3Crect fill="%23ddd" width="300" height="200" rx="10"/%3E%3Ctext x="50%25" y="50%25" font-size="14" fill="%23666" text-anchor="middle" dy=".3em"%3ESem Imagem%3C/text%3E%3C/svg%3E',
                 totalRevenue: 0,
                 playedNumbers: [],
-                winnerNumber: null, // Será definido quando atingir 150%
+                winnerNumber: null,
                 availablePlays: 0,
                 totalPlaysEnabled: 0,
                 status: 'active',
@@ -891,18 +1202,25 @@
                 playsHistory: []
             };
             
-            games.push(newGame);
-            
-            // Reset form
-            document.getElementById('prizeDescription').value = '';
-            document.getElementById('prizeValue').value = '';
-            document.getElementById('numbersCount').value = '';
-            document.getElementById('prizeImage').value = '';
-            
-            alert('Jogo criado com sucesso!');
-            showAdmin();
+            try {
+                await saveGame(newGame);
+                games.push(newGame);
+                
+                // Reset form
+                document.getElementById('prizeDescription').value = '';
+                document.getElementById('prizeValue').value = '';
+                document.getElementById('numbersCount').value = '';
+                document.getElementById('prizeImage').value = '';
+                
+                alert('Jogo criado com sucesso!');
+                showAdmin();
+            } catch (error) {
+                console.error('Error creating game:', error);
+                alert('Erro ao criar jogo: ' + error.message);
+            }
         }
 
+        // Game Selection and Display
         function populateGamesList() {
             const gamesList = document.getElementById('gamesList');
             gamesList.innerHTML = '';
@@ -950,8 +1268,6 @@
                 return;
             }
             
-            console.log('Iniciando jogo:', currentGame);
-            
             if (currentGame.status === 'completed') {
                 alert('Este jogo já foi finalizado!');
                 return;
@@ -960,7 +1276,6 @@
             updateGamePlayScreen();
             showScreen('gamePlayScreen');
             
-            // Força uma nova população dos números após um pequeno delay
             setTimeout(() => {
                 populateNumbers();
             }, 100);
@@ -996,15 +1311,10 @@
             const numbersGrid = document.getElementById('numbersGrid');
             numbersGrid.innerHTML = '';
             
-            // Verificar se o jogo atual existe
             if (!currentGame) {
                 console.error('Jogo atual não encontrado');
                 return;
             }
-            
-            console.log('Populando números para o jogo:', currentGame.description);
-            console.log('Quantidade de números:', currentGame.numbersCount);
-            console.log('Jogadas disponíveis:', currentGame.availablePlays);
             
             // Determinar classe responsiva baseada na quantidade de números
             numbersGrid.className = 'numbers-grid';
@@ -1051,14 +1361,13 @@
                 
                 numbersGrid.appendChild(numberCard);
             }
-            
-            console.log('Números criados:', numbersGrid.children.length);
         }
 
         function updateAvailablePlays() {
             document.getElementById('availablePlays').textContent = currentGame.availablePlays;
         }
 
+        // Play Management
         function showEnablePlaysModal() {
             document.getElementById('enablePlaysModal').classList.add('show');
             document.getElementById('numberOfPlays').oninput = updateTotalCost;
@@ -1077,14 +1386,13 @@
             document.getElementById('totalCost').textContent = totalCost.toFixed(2);
         }
 
-        function enablePlays() {
-            const password = document.getElementById('enablePlaysPassword').value;
-            const numberOfPlays = parseInt(document.getElementById('numberOfPlays').value);
-            
-            if (password !== 'admin123') {
-                alert('Senha incorreta!');
+        async function enablePlays() {
+            if (!auth.currentUser) {
+                alert('Você precisa estar logado como administrador!');
                 return;
             }
+
+            const numberOfPlays = parseInt(document.getElementById('numberOfPlays').value);
             
             if (!numberOfPlays || numberOfPlays < 1) {
                 alert('Número de jogadas inválido!');
@@ -1101,14 +1409,22 @@
                 cost: numberOfPlays * PLAY_VALUE
             });
             
-            updateAvailablePlays();
-            populateNumbers();
-            closeEnablePlaysModal();
-            
-            alert(`${numberOfPlays} jogada(s) liberada(s) com sucesso!\nCusto total: R$ ${(numberOfPlays * PLAY_VALUE).toFixed(2)}`);
+            try {
+                await saveGame(currentGame);
+                
+                updateAvailablePlays();
+                populateNumbers();
+                closeEnablePlaysModal();
+                
+                alert(`${numberOfPlays} jogada(s) liberada(s) com sucesso!\nCusto total: R$ ${(numberOfPlays * PLAY_VALUE).toFixed(2)}`);
+            } catch (error) {
+                console.error('Error enabling plays:', error);
+                alert('Erro ao liberar jogadas: ' + error.message);
+            }
         }
 
-        function scratchNumber(number, card) {
+        // Game Logic
+        async function scratchNumber(number, card) {
             if (currentGame.playedNumbers.includes(number) || currentGame.availablePlays <= 0) return;
             
             // Reduzir jogadas disponíveis
@@ -1137,18 +1453,31 @@
                 }, 500);
             }
             
+            // Salvar no Firebase
+            try {
+                await saveGame(currentGame);
+                
+                // Salvar no histórico
+                const historyEntry = {
+                    gameId: currentGame.id,
+                    gameDescription: currentGame.description,
+                    number: number,
+                    isWinner: number === currentGame.winnerNumber && canWin(),
+                    value: currentGame.playValue,
+                    timestamp: new Date().toISOString()
+                };
+                
+                await saveGameHistory(historyEntry);
+                gameHistory.unshift(historyEntry);
+                
+            } catch (error) {
+                console.error('Error saving game state:', error);
+                alert('Erro ao salvar jogada. Tente novamente.');
+                return;
+            }
+            
             // Atualizar displays
             updateGamePlayScreen();
-            
-            // Salvar no histórico
-            gameHistory.push({
-                gameId: currentGame.id,
-                gameDescription: currentGame.description,
-                number: number,
-                isWinner: number === currentGame.winnerNumber && canWin(),
-                value: currentGame.playValue,
-                timestamp: new Date().toISOString()
-            });
         }
 
         function checkAndSetWinner() {
@@ -1192,6 +1521,7 @@
             document.getElementById('winnerModal').classList.remove('show');
         }
 
+        // Reports and History
         function populateReports() {
             const reportsContent = document.getElementById('reportsContent');
             reportsContent.innerHTML = '';
@@ -1199,7 +1529,6 @@
             games.forEach(game => {
                 const requiredRevenue = game.value * 1.5;
                 const profit = game.totalRevenue - game.value;
-                const profitPercentage = game.totalRevenue > 0 ? (profit / game.totalRevenue) * 100 : 0;
                 
                 const reportSection = document.createElement('div');
                 reportSection.className = 'report-section';
@@ -1325,7 +1654,7 @@
                 return;
             }
             
-            gameHistory.slice().reverse().forEach(play => {
+            gameHistory.forEach(play => {
                 const historyItem = document.createElement('div');
                 historyItem.className = 'history-item';
                 historyItem.innerHTML = `
@@ -1340,7 +1669,7 @@
 
         // Initialize the app
         window.onload = function() {
-            showLogin();
+            initializeFirebase();
         };
     </script>
 </body>
